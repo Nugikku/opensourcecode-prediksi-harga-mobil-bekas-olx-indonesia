@@ -119,16 +119,6 @@ print(f"Fitur: {fitur}")
 # Split 80% data latih dan 20% data uji
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-# Simpan sampel data uji murni (unseen test data) untuk pengujian mandiri di test_prediksi.py
-df_test_clean = X_test.copy()
-df_test_clean['harga'] = y_test
-if 'judul' in df.columns:
-    df_test_clean['judul'] = df.loc[df_test_clean.index, 'judul']
-sampel_uji_export = df_test_clean.sample(min(25, len(df_test_clean)), random_state=42).reset_index(drop=True)
-sampel_uji_export.to_csv("data_uji_sampel.csv", index=False)
-sampel_uji_export.to_csv(os.path.join(OUTPUT_DIR, "data_uji_sampel.csv"), index=False)
-print(f"Sampel data uji murni (25 data) disimpan ke 'data_uji_sampel.csv'!")
-
 # ============================================================
 # 3. PIPELINE PREPROCESSING
 # ============================================================

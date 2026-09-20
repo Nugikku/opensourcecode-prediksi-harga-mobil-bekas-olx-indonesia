@@ -261,25 +261,12 @@ print(skrip_negosiasi)
 print("=" * 60 + "\n")
 
 # ============================================================
-# 5. PENGUJIAN MENGGUNAKAN DATA RIIL (DATA UJI MURNI / TEST SET)
+# 5. PENGUJIAN MENGGUNAKAN DATA RIIL (5 SAMPEL DARI DATASET)
 # ============================================================
-# Ambil dari data_uji_sampel.csv (data uji murni tanpa kebocoran data latih)
-file_sampel = "data_uji_sampel.csv"
-if not os.path.exists(file_sampel):
-    for fldr in folder_output:
-        calon = os.path.join(fldr, "data_uji_sampel.csv")
-        if os.path.exists(calon):
-            file_sampel = calon
-            break
-
-if os.path.exists(file_sampel):
-    df_uji = pd.read_csv(file_sampel)
-    sampel_uji = df_uji.head(5).copy()
-else:
-    df_uji = pd.read_csv("dataset_olx_bersih.csv")
-    df_uji['model'] = df_uji['judul'].apply(ekstrak_model)
-    df_uji['merek'] = df_uji['merek'].astype(str).str.strip().str.title()
-    sampel_uji = df_uji.sample(n=5, random_state=42).reset_index(drop=True)
+df_uji = pd.read_csv("dataset_olx_bersih.csv")
+df_uji['model'] = df_uji['judul'].apply(ekstrak_model)
+df_uji['merek'] = df_uji['merek'].astype(str).str.strip().str.title()
+sampel_uji = df_uji.sample(n=5, random_state=42).reset_index(drop=True)
 
 sampel_uji['harga_prediksi'] = model.predict(sampel_uji[fitur])
 sampel_uji['selisih'] = abs(sampel_uji['harga'] - sampel_uji['harga_prediksi'])
