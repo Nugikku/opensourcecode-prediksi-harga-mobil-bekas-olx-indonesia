@@ -94,17 +94,9 @@ Model Pemenang Terpilih: Random Forest Regressor (R2: 0.8671)
 ============================================================\n""")
 
 # ============================================================
-# 3. LOAD MODEL
+# 3. LOAD MODEL HASIL PELATIHAN
 # ============================================================
-file_model = "model_prediksi_mobil.pkl"
-if not os.path.exists(file_model):
-    for fldr in [f for f in os.listdir(".") if f.startswith("dataset_") and os.path.isdir(f)]:
-        calon = os.path.join(fldr, "model_prediksi_mobil.pkl")
-        if os.path.exists(calon):
-            file_model = calon
-            break
-
-with open(file_model, "rb") as f:
+with open("model_prediksi_mobil.pkl", "rb") as f:
     model = pickle.load(f)
 
 # ============================================================
@@ -115,15 +107,7 @@ print("   AUTOVALUATE: SMART DEAL DETECTOR & NEGOTIATION SUPPORT   ")
 print("=" * 60)
 
 # Bentuk mapping Merek -> Model riil dari dataset
-file_dataset = "dataset_olx_bersih.csv"
-if not os.path.exists(file_dataset):
-    for fldr in [f for f in os.listdir(".") if f.startswith("dataset_") and os.path.isdir(f)]:
-        calon = os.path.join(fldr, "dataset_olx_bersih.csv")
-        if os.path.exists(calon):
-            file_dataset = calon
-            break
-
-df_temp = pd.read_csv(file_dataset)
+df_temp = pd.read_csv("dataset_olx_bersih.csv")
 df_temp['model'] = df_temp['judul'].apply(ekstrak_model)
 df_temp['merek'] = df_temp['merek'].astype(str).str.strip().str.title()
 daftar_merek = sorted(df_temp['merek'].unique())
@@ -292,7 +276,7 @@ if os.path.exists(file_sampel):
     df_uji = pd.read_csv(file_sampel)
     sampel_uji = df_uji.head(5).copy()
 else:
-    df_uji = pd.read_csv(file_dataset)
+    df_uji = pd.read_csv("dataset_olx_bersih.csv")
     df_uji['model'] = df_uji['judul'].apply(ekstrak_model)
     df_uji['merek'] = df_uji['merek'].astype(str).str.strip().str.title()
     sampel_uji = df_uji.sample(n=5, random_state=42).reset_index(drop=True)
