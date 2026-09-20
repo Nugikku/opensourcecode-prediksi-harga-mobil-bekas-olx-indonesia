@@ -66,7 +66,7 @@ async def scrape_olx(target_data=3000):
             "https://www.olx.co.id/mobil-bekas_c198/honda_m27",
             "https://www.olx.co.id/mobil-bekas_c198/daihatsu_m19",
             "https://www.olx.co.id/mobil-bekas_c198/suzuki_m52",
-            "https://www.olx.co.id/mobil-bekas_c198/mitsubishi_m42"
+            "https://www.olx.co.id/mobil-bekas_c198/mitsubishi_m42",
             # Kategori berdasarkan Wilayah
             "https://www.olx.co.id/jakarta-dki_g2000007/mobil-bekas_c198",
             "https://www.olx.co.id/jawa-barat_g2000008/mobil-bekas_c198",
