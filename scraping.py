@@ -59,14 +59,15 @@ async def scrape_olx(target_data=3000):
 
         # Daftar URL diperluas: gabungan berbagai wilayah utama dan kategori per merek
         urls = [
+            # Kategori Utama
+            "https://www.olx.co.id/mobil-bekas_c198",
             # Kategori Berdasarkan Merek Populer
             "https://www.olx.co.id/mobil-bekas_c198/toyota_m53",
             "https://www.olx.co.id/mobil-bekas_c198/honda_m27",
             "https://www.olx.co.id/mobil-bekas_c198/daihatsu_m19",
             "https://www.olx.co.id/mobil-bekas_c198/suzuki_m52",
             "https://www.olx.co.id/mobil-bekas_c198/mitsubishi_m42"
-            # Wilayah Utama
-            "https://www.olx.co.id/mobil-bekas_c198",
+            # Kategori berdasarkan Wilayah
             "https://www.olx.co.id/jakarta-dki_g2000007/mobil-bekas_c198",
             "https://www.olx.co.id/jawa-barat_g2000008/mobil-bekas_c198",
             "https://www.olx.co.id/jawa-timur_g2000010/mobil-bekas_c198",
@@ -76,7 +77,6 @@ async def scrape_olx(target_data=3000):
             "https://www.olx.co.id/bali_g2000002/mobil-bekas_c198",
             "https://www.olx.co.id/yogyakarta-di_g2000033/mobil-bekas_c198",
             "https://www.olx.co.id/sulawesi-selatan_g2000025/mobil-bekas_c198",
-            # Wilayah Tambahan
             "https://www.olx.co.id/riau_g2000020/mobil-bekas_c198",
             "https://www.olx.co.id/sumatera-selatan_g2000021/mobil-bekas_c198",
             "https://www.olx.co.id/lampung_g2000015/mobil-bekas_c198",
