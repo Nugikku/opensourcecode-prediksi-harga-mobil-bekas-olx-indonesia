@@ -34,6 +34,8 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.linear_model import Ridge
+from sklearn.neighbors import KNeighborsRegressor
+from sklearn.tree import DecisionTreeRegressor
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
 from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
 
@@ -137,6 +139,8 @@ preprocessor = ColumnTransformer(
 # ============================================================
 models = {
     "Ridge Regression (Baseline)": Ridge(),
+    "K-Nearest Neighbors (KNN)": KNeighborsRegressor(n_neighbors=5),
+    "Decision Tree Regressor": DecisionTreeRegressor(random_state=42),
     "Gradient Boosting Regressor": GradientBoostingRegressor(n_estimators=150, random_state=42),
     "Random Forest Regressor": RandomForestRegressor(n_estimators=200, random_state=42)
 }
@@ -210,6 +214,8 @@ print(f"\nMembuat visualisasi ke folder '{OUTPUT_DIR}/'...")
 
 warna_model = {
     "Ridge Regression (Baseline)": "#9CA3AF",
+    "K-Nearest Neighbors (KNN)": "#F59E0B",
+    "Decision Tree Regressor": "#EC4899",
     "Gradient Boosting Regressor": "#60A5FA",
     "Random Forest Regressor": "#34D399",
 }
@@ -221,7 +227,7 @@ def _tandai_pemenang(labels):
 
 
 # --- 6.1 Bar chart perbandingan R2 ---
-fig, ax = plt.subplots(figsize=(8, 5))
+fig, ax = plt.subplots(figsize=(10, 5.5))
 warna = [warna_model.get(m, "#9CA3AF") for m in df_metrik["model"]]
 bars = ax.bar(_tandai_pemenang(df_metrik["model"]), df_metrik["r2"], color=warna)
 ax.set_ylabel("R2 Score")
@@ -230,19 +236,19 @@ ax.set_ylim(0, max(1.0, df_metrik["r2"].max() * 1.15))
 for bar, val in zip(bars, df_metrik["r2"]):
     ax.text(bar.get_x() + bar.get_width() / 2, val + 0.01, f"{val:.3f}",
              ha="center", va="bottom", fontsize=9)
-plt.xticks(rotation=15, ha="right")
+plt.xticks(rotation=20, ha="right")
 plt.tight_layout()
 plt.savefig(os.path.join(OUTPUT_DIR, "perbandingan_r2.png"), dpi=150)
 plt.close(fig)
 
 # --- 6.2 Bar chart perbandingan MAE & RMSE ---
-fig, ax = plt.subplots(figsize=(9, 5))
+fig, ax = plt.subplots(figsize=(10.5, 5.5))
 x = np.arange(len(df_metrik))
 lebar = 0.35
 ax.bar(x - lebar / 2, df_metrik["mae"], lebar, label="MAE", color="#F59E0B")
 ax.bar(x + lebar / 2, df_metrik["rmse"], lebar, label="RMSE", color="#EF4444")
 ax.set_xticks(x)
-ax.set_xticklabels(_tandai_pemenang(df_metrik["model"]), rotation=15, ha="right")
+ax.set_xticklabels(_tandai_pemenang(df_metrik["model"]), rotation=20, ha="right")
 ax.set_ylabel("Error (Rp)")
 ax.set_title("Perbandingan MAE & RMSE Antar Model\n(* = model pemenang, makin kecil makin baik)")
 ax.legend()
