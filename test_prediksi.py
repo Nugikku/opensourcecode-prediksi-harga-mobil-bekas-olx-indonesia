@@ -1,3 +1,4 @@
+import os
 import pickle
 import pandas as pd
 import numpy as np
@@ -49,28 +50,61 @@ print(f"Fitur: {fitur}\n")
 print("=" * 60)
 print("HASIL EVALUASI KOMPARASI MODEL")
 print("=" * 60)
-print("""Model: Ridge Regression (Baseline)
-- R2 Score (Akurasi Variansi): 0.2695
-- MAE (Rata-rata Error)       : Rp 301,683,552
-- RMSE                       : Rp 428,388,295
+
+# Cari file ringkasan_metrik.csv dari folder pelatihan terbaru
+folder_output = sorted([f for f in os.listdir(".") if f.startswith("output_gambar_pelatihan_") and os.path.isdir(f)], reverse=True)
+file_metrik = None
+if folder_output:
+    calon = os.path.join(folder_output[0], "ringkasan_metrik.csv")
+    if os.path.exists(calon):
+        file_metrik = calon
+
+if file_metrik and os.path.exists(file_metrik):
+    df_met = pd.read_csv(file_metrik)
+    df_met_sorted = df_met.sort_values(by="r2", ascending=False)
+    pemenang = df_met_sorted.iloc[0]
+
+    for _, row in df_met.iterrows():
+        print(f"Model: {row['model']}")
+        if 'r2_train' in row and pd.notna(row['r2_train']):
+            print(f"- R2 Data Latih (Train)       : {row['r2_train']:.4f}")
+        print(f"- R2 Score (Akurasi Variansi): {row['r2']:.4f}")
+        print(f"- MAE (Rata-rata Error)       : Rp {row['mae']:,.0f}")
+        print(f"- RMSE                       : Rp {row['rmse']:,.0f}\n")
+    print("=" * 60)
+    print(f"Model Pemenang Terpilih: {pemenang['model']} (R2: {pemenang['r2']:.4f})")
+    print("=" * 60 + "\n")
+else:
+    print("""Model: Ridge Regression (Baseline)
+- R2 Score (Akurasi Variansi): 0.1938
+- MAE (Rata-rata Error)       : Rp 189,957,018
+- RMSE                       : Rp 302,978,370
 
 Model: Gradient Boosting Regressor
-- R2 Score (Akurasi Variansi): 0.6182
-- MAE (Rata-rata Error)       : Rp 192,594,751
-- RMSE                       : Rp 309,689,501
+- R2 Score (Akurasi Variansi): 0.8080
+- MAE (Rata-rata Error)       : Rp 80,218,267
+- RMSE                       : Rp 147,877,029
 
 Model: Random Forest Regressor
-- R2 Score (Akurasi Variansi): 0.6476
-- MAE (Rata-rata Error)       : Rp 177,131,474
-- RMSE                       : Rp 297,544,232""")
-print("=" * 60)
-print("Model Pemenang Terpilih: Random Forest Regressor (R2: 0.6476)")
-print("=" * 60 + "\n")
+- R2 Score (Akurasi Variansi): 0.8671
+- MAE (Rata-rata Error)       : Rp 59,265,960
+- RMSE                       : Rp 123,031,991
+============================================================
+Model Pemenang Terpilih: Random Forest Regressor (R2: 0.8671)
+============================================================\n""")
 
 # ============================================================
 # 3. LOAD MODEL
 # ============================================================
-with open("model_prediksi_mobil.pkl", "rb") as f:
+file_model = "model_prediksi_mobil.pkl"
+if not os.path.exists(file_model):
+    for fldr in [f for f in os.listdir(".") if f.startswith("dataset_") and os.path.isdir(f)]:
+        calon = os.path.join(fldr, "model_prediksi_mobil.pkl")
+        if os.path.exists(calon):
+            file_model = calon
+            break
+
+with open(file_model, "rb") as f:
     model = pickle.load(f)
 
 # ============================================================
@@ -81,7 +115,15 @@ print("   AUTOVALUATE: SMART DEAL DETECTOR & NEGOTIATION SUPPORT   ")
 print("=" * 60)
 
 # Bentuk mapping Merek -> Model riil dari dataset
-df_temp = pd.read_csv("dataset_olx_bersih.csv")
+file_dataset = "dataset_olx_bersih.csv"
+if not os.path.exists(file_dataset):
+    for fldr in [f for f in os.listdir(".") if f.startswith("dataset_") and os.path.isdir(f)]:
+        calon = os.path.join(fldr, "dataset_olx_bersih.csv")
+        if os.path.exists(calon):
+            file_dataset = calon
+            break
+
+df_temp = pd.read_csv(file_dataset)
 df_temp['model'] = df_temp['judul'].apply(ekstrak_model)
 df_temp['merek'] = df_temp['merek'].astype(str).str.strip().str.title()
 daftar_merek = sorted(df_temp['merek'].unique())
@@ -235,18 +277,33 @@ print(skrip_negosiasi)
 print("=" * 60 + "\n")
 
 # ============================================================
-# 5. PENGUJIAN MENGGUNAKAN DATA RIIL OLX (5 SAMPEL TETAP UTUH)
+# 5. PENGUJIAN MENGGUNAKAN DATA RIIL (DATA UJI MURNI / TEST SET)
 # ============================================================
-df = pd.read_csv("dataset_olx_bersih.csv")
-df['model'] = df['judul'].apply(ekstrak_model)
+# Ambil dari data_uji_sampel.csv (data uji murni tanpa kebocoran data latih)
+file_sampel = "data_uji_sampel.csv"
+if not os.path.exists(file_sampel):
+    for fldr in folder_output:
+        calon = os.path.join(fldr, "data_uji_sampel.csv")
+        if os.path.exists(calon):
+            file_sampel = calon
+            break
 
-sampel_uji = df.sample(n=5, random_state=42).reset_index(drop=True)
+if os.path.exists(file_sampel):
+    df_uji = pd.read_csv(file_sampel)
+    sampel_uji = df_uji.head(5).copy()
+else:
+    df_uji = pd.read_csv(file_dataset)
+    df_uji['model'] = df_uji['judul'].apply(ekstrak_model)
+    df_uji['merek'] = df_uji['merek'].astype(str).str.strip().str.title()
+    sampel_uji = df_uji.sample(n=5, random_state=42).reset_index(drop=True)
+
 sampel_uji['harga_prediksi'] = model.predict(sampel_uji[fitur])
 sampel_uji['selisih'] = abs(sampel_uji['harga'] - sampel_uji['harga_prediksi'])
 
-print("=== PENGUJIAN MENGGUNAKAN DATA RIIL (MODEL BARU) ===")
+print("=== PENGUJIAN MENGGUNAKAN DATA RIIL (DATA UJI MURNI) ===")
 for i, row in sampel_uji.iterrows():
-    print(f"\nUnit [{i+1}]: {row['judul']}")
+    judul_tampil = row.get('judul', f"{row['merek']} {row['model']} {int(row['tahun'])}")
+    print(f"\nUnit [{i+1}]: {judul_tampil}")
     print(f"- Input Model   : {row['merek']} {row['model']} | {int(row['tahun'])} | {row['transmisi']} | {int(row['jarak_tempuh']):,} km")
     print(f"- Harga Asli OLX: Rp {int(row['harga']):,}")
     print(f"- Prediksi Model: Rp {int(row['harga_prediksi']):,}")

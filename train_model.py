@@ -30,7 +30,7 @@ matplotlib.use("Agg")  # render ke file, tidak butuh display
 import matplotlib.pyplot as plt
 
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import OneHotEncoder
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.linear_model import Ridge
@@ -61,7 +61,7 @@ DAFTAR_MODEL = [
     # Mitsubishi
     "xpander", "pajero", "outlander", "mirage", "triton", "eclipse",
     # Suzuki
-    "ertiga", "xl7", "ignis", "baleno", "jimny", "karimun", "sx4", "s-presso", "grand vitara",
+    "ertiga", "xl7", "ignis", "baleno", "jimny", "karimun", "sx4", "s-presso", "grand vitara", "every",
     # Nissan
     "grand livina", "livina", "serena", "xtrail", "juke", "march", "kicks", "magnite", "teana", "elgrand",
     # BMW & Mercedes
@@ -90,12 +90,21 @@ def ekstrak_model(judul):
 # 2. LOAD DATA & PERSIAPAN FITUR
 # ============================================================
 print("Membaca data bersih...")
-df = pd.read_csv("dataset_olx_bersih.csv")
+file_dataset = "dataset_olx_bersih.csv"
+if not os.path.exists(file_dataset):
+    for fldr in [f for f in os.listdir(".") if f.startswith("dataset_") and os.path.isdir(f)]:
+        calon = os.path.join(fldr, "dataset_olx_bersih.csv")
+        if os.path.exists(calon):
+            file_dataset = calon
+            break
 
-# Ekstraksi tipe/seri mobil ke kolom 'model'
+df = pd.read_csv(file_dataset)
+
+# Standarisasi kolom merek & ekstraksi model
+df['merek'] = df['merek'].astype(str).str.strip().str.title()
 df['model'] = df['judul'].apply(ekstrak_model)
 
-# Atribut yang digunakan untuk memprediksi harga
+# Atribut yang digunakan untuk memprediksi harga (Sesuai Proposal)
 fitur = ['merek', 'model', 'tahun', 'transmisi', 'jarak_tempuh']
 target = 'harga'
 
@@ -110,6 +119,16 @@ print(f"Fitur: {fitur}")
 # Split 80% data latih dan 20% data uji
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
+# Simpan sampel data uji murni (unseen test data) untuk pengujian mandiri di test_prediksi.py
+df_test_clean = X_test.copy()
+df_test_clean['harga'] = y_test
+if 'judul' in df.columns:
+    df_test_clean['judul'] = df.loc[df_test_clean.index, 'judul']
+sampel_uji_export = df_test_clean.sample(min(25, len(df_test_clean)), random_state=42).reset_index(drop=True)
+sampel_uji_export.to_csv("data_uji_sampel.csv", index=False)
+sampel_uji_export.to_csv(os.path.join(OUTPUT_DIR, "data_uji_sampel.csv"), index=False)
+print(f"Sampel data uji murni (25 data) disimpan ke 'data_uji_sampel.csv'!")
+
 # ============================================================
 # 3. PIPELINE PREPROCESSING
 # ============================================================
@@ -119,7 +138,7 @@ numerical_cols = ['tahun', 'jarak_tempuh']
 preprocessor = ColumnTransformer(
     transformers=[
         ('cat', OneHotEncoder(handle_unknown='ignore'), categorical_cols),
-        ('num', 'passthrough', numerical_cols)
+        ('num', StandardScaler(), numerical_cols)
     ]
 )
 
@@ -151,27 +170,31 @@ for nama_model, regressor in models.items():
     ])
 
     pipeline.fit(X_train, y_train)
+    y_train_pred = pipeline.predict(X_train)
     y_pred = pipeline.predict(X_test)
 
-    r2 = r2_score(y_test, y_pred)
+    r2_train = r2_score(y_train, y_train_pred)
+    r2_test = r2_score(y_test, y_pred)
     mae = mean_absolute_error(y_test, y_pred)
     rmse = np.sqrt(mean_squared_error(y_test, y_pred))
 
     print(f"\nModel: {nama_model}")
-    print(f"- R2 Score (Akurasi Variansi): {r2:.4f}")
+    print(f"- R2 Data Latih (Train)       : {r2_train:.4f}")
+    print(f"- R2 Data Uji (Test / Akurasi): {r2_test:.4f}")
     print(f"- MAE (Rata-rata Error)       : Rp {mae:,.0f}")
     print(f"- RMSE                       : Rp {rmse:,.0f}")
 
     hasil_metrik.append({
         "model": nama_model,
-        "r2": r2,
+        "r2_train": r2_train,
+        "r2": r2_test,
         "mae": mae,
         "rmse": rmse,
     })
     semua_prediksi[nama_model] = y_pred
 
-    if r2 > best_r2:
-        best_r2 = r2
+    if r2_test > best_r2:
+        best_r2 = r2_test
         best_model_name = nama_model
         best_model_pipeline = pipeline
         best_y_pred = y_pred

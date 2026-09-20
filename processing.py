@@ -76,9 +76,9 @@ def cari_tahun(row):
     return None
 
 def tentukan_transmisi(row):
-    """Deteksi transmisi dari gabungan kolom transmisi dan teks judul."""
-    gabungan = f"{row.get('transmisi', '')} {row.get('judul', '')}".lower()
-    if any(k in gabungan for k in [' matic', '-at', ' at ', ' a/t', 'otomatis', ' tiptronic', ' triptonic']):
+    """Deteksi transmisi dari gabungan kolom transmisi, teks judul, dan cuplikan deskripsi."""
+    gabungan = f"{row.get('transmisi', '')} {row.get('judul', '')} {str(row.get('deskripsi', ''))[:300]}".lower()
+    if any(k in gabungan for k in [' matic', '-at', ' at ', ' a/t', 'otomatis', ' tiptronic', ' triptonic', ' cvt ']):
         return 'otomatis'
     elif any(k in gabungan for k in [' manual', '-mt', ' mt ', ' m/t']):
         return 'manual'
@@ -106,20 +106,26 @@ def main():
     df['harga'] = df['harga'].apply(bersihkan_angka_harga)
     df['jarak_tempuh'] = df['jarak_tempuh'].apply(perbaiki_jarak_tempuh)
 
-    # 3. Hapus Duplikat
-    df = df.drop_duplicates(subset=['merek', 'tahun', 'jarak_tempuh', 'harga'], keep='first')
-
-    # 4. Tangani Missing Values pada Jarak Tempuh dengan Median
-    median_km = df['jarak_tempuh'].dropna().median()
-    df['jarak_tempuh'] = df['jarak_tempuh'].fillna(median_km).astype(int)
-
-    # 5. Filter Data Masuk Akal (Outlier)
+    # 3. Filter Data Masuk Akal & Validitas Tahun & Harga
     df = df.dropna(subset=['harga', 'tahun'])
     df = df[(df['harga'] >= 25_000_000) & (df['harga'] <= 2_500_000_000)]
     df = df[(df['tahun'] >= 1995) & (df['tahun'] <= 2026)]
     df['tahun'] = df['tahun'].astype(int)
 
-    # 6. Normalisasi Kolom Teks
+    # 4. Standarisasi Format Merek (Title Case)
+    df['merek'] = df['merek'].astype(str).str.strip().str.title()
+
+    # 5. Hapus Duplikat
+    if 'id_iklan' in df.columns:
+        df = df.drop_duplicates(subset=['id_iklan'], keep='first')
+    df = df.drop_duplicates(subset=['merek', 'judul', 'tahun', 'jarak_tempuh', 'harga'], keep='first')
+
+    # 6. Tangani Missing Values pada Jarak Tempuh dengan Median per Tahun (Fallback Median Global)
+    median_global = df['jarak_tempuh'].dropna().median()
+    df['jarak_tempuh'] = df.groupby('tahun')['jarak_tempuh'].transform(lambda s: s.fillna(s.median()))
+    df['jarak_tempuh'] = df['jarak_tempuh'].fillna(median_global).astype(int)
+
+    # 7. Normalisasi Kolom Teks
     if 'deskripsi' in df.columns:
         df['deskripsi_bersih'] = df['deskripsi'].apply(bersihkan_dan_normalisasi_teks)
     if 'judul' in df.columns:
@@ -128,7 +134,7 @@ def main():
     df = df.reset_index(drop=True)
     print(f"Data bersih siap latih: {len(df)} baris")
 
-    # 7. Simpan Hasil
+    # 8. Simpan Hasil
     df.to_csv(OUTPUT_FILE, index=False, encoding='utf-8-sig')
     print(f"Selesai! Disimpan ke '{OUTPUT_FILE}'\n")
     print("Contoh 5 data teratas:")
