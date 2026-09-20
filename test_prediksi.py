@@ -46,9 +46,9 @@ def ekstrak_model(judul):
 # ============================================================
 fitur = ['merek', 'model', 'tahun', 'transmisi', 'jarak_tempuh']
 print(f"Fitur: {fitur}\n")
-print("=" * 50)
+print("=" * 60)
 print("HASIL EVALUASI KOMPARASI MODEL")
-print("=" * 50)
+print("=" * 60)
 print("""Model: Ridge Regression (Baseline)
 - R2 Score (Akurasi Variansi): 0.2695
 - MAE (Rata-rata Error)       : Rp 301,683,552
@@ -63,9 +63,9 @@ Model: Random Forest Regressor
 - R2 Score (Akurasi Variansi): 0.6476
 - MAE (Rata-rata Error)       : Rp 177,131,474
 - RMSE                       : Rp 297,544,232""")
-print("=" * 50)
+print("=" * 60)
 print("Model Pemenang Terpilih: Random Forest Regressor (R2: 0.6476)")
-print("=" * 50 + "\n")
+print("=" * 60 + "\n")
 
 # ============================================================
 # 3. LOAD MODEL
@@ -74,18 +74,16 @@ with open("model_prediksi_mobil.pkl", "rb") as f:
     model = pickle.load(f)
 
 # ============================================================
-# 4. INPUT INTERAKTIF PENGGUNA (DYNAMIC MENU BERDASARKAN DATA)
+# 4. INPUT INTERAKTIF PENGGUNA (DYNAMIC DROPDOWN + HARGA IKLAN)
 # ============================================================
-print("=" * 50)
-print("     FORM PREDIKSI HARGA MOBIL BEKAS (INPUT USER)     ")
-print("=" * 50)
+print("=" * 60)
+print("   AUTOVALUATE: SMART DEAL DETECTOR & NEGOTIATION SUPPORT   ")
+print("=" * 60)
 
-# 1. Bentuk daftar mapping Merek -> Model riil dari dataset
+# Bentuk mapping Merek -> Model riil dari dataset
 df_temp = pd.read_csv("dataset_olx_bersih.csv")
 df_temp['model'] = df_temp['judul'].apply(ekstrak_model)
 df_temp['merek'] = df_temp['merek'].astype(str).str.strip().str.title()
-
-# Buat dictionary otomatis dari data
 daftar_merek = sorted(df_temp['merek'].unique())
 
 # --- PILIH MEREK ---
@@ -104,7 +102,7 @@ while True:
     except ValueError:
         print("[!] Masukkan angka pilihan yang valid.")
 
-# --- PILIH TIPE / MODEL (OTOMATIS SESUAI MEREK TERPILIH) ---
+# --- PILIH MODEL BERDASARKAN MEREK ---
 model_tersedia = sorted(df_temp[df_temp['merek'] == merek_input]['model'].unique())
 if 'Lainnya' in model_tersedia:
     model_tersedia.remove('Lainnya')
@@ -125,7 +123,7 @@ while True:
     except ValueError:
         print("[!] Masukkan angka pilihan yang valid.")
 
-# --- INPUT ATRIBUT LAINNYA ---
+# --- INPUT SPESIFIKASI LAINNYA ---
 print(f"\nUnit Terpilih: {merek_input} {model_input}")
 
 while True:
@@ -152,11 +150,21 @@ while True:
         km_input = int(input("Masukkan Jarak Tempuh / KM (0 - 500000): ").strip())
         if 0 <= km_input <= 500000:
             break
-        print("[!] Kilometer harus antara 0 sampai 500.000 km.")
+        print("[!] Jarak tempuh harus antara 0 sampai 500.000 km.")
     except ValueError:
         print("[!] Masukkan angka kilometer yang valid.")
 
-# --- EKSEKUSI PREDIKSI ---
+# --- INPUT HARGA IKLAN PENJUAL DI OLX ---
+while True:
+    try:
+        harga_iklan_input = float(input("Masukkan Harga Penawaran Iklan Penjual di OLX (Rp): ").strip())
+        if harga_iklan_input > 0:
+            break
+        print("[!] Harga penawaran harus lebih dari 0.")
+    except ValueError:
+        print("[!] Masukkan nominal harga yang valid.")
+
+# --- KOMPUTASI MODEL PREDIKSI ---
 data_user = pd.DataFrame([{
     'merek': merek_input,
     'model': model_input,
@@ -165,16 +173,69 @@ data_user = pd.DataFrame([{
     'jarak_tempuh': km_input
 }])
 
-prediksi_user = model.predict(data_user)[0]
+harga_wajar = float(model.predict(data_user)[0])
+selisih = harga_iklan_input - harga_wajar
+rasio = (selisih / harga_wajar) * 100
 
-print("\n--- HASIL PREDIKSI INPUT USER ---")
-print(f"Unit            : {merek_input} {model_input}")
-print(f"- Input Model   : {merek_input} {model_input} | {tahun_input} | {transmisi_input} | {km_input:,} km")
-print(f"- Prediksi Model: Rp {int(prediksi_user):,}")
-print("=" * 50 + "\n")
+bid_awal = round(harga_wajar * 0.93)
+bid_maks = round(harga_wajar)
+
+# Evaluasi Status Berdasarkan Rasio Deviasi
+if rasio > 7:
+    badge_status = f"[!] KEMAHALAN / OVERPRICED (+{rasio:.1f}%)"
+    skor_kewajaran = max(30, min(65, int(100 - rasio)))
+    keterangan_selisih = f"Iklan +{rasio:.1f}% di atas estimasi pasar wajar"
+    skrip_negosiasi = (
+        f'"Halo Pak/Bu, saya tertarik dengan {model_input} {tahun_input} ini. '
+        f'Berdasarkan acuan nilai pasar wajar untuk pemakaian {km_input:,} km, '
+        f'harga rata-rata pasaran berada di sekitar Rp {int(harga_wajar):,}. '
+        f'Jika memungkinkan, saya mengajukan penawaran awal di Rp {int(bid_awal):,} '
+        f'setelah pengecekan fisik unit."'
+    )
+elif rasio < -15:
+    badge_status = f"[?] TERLALU MURAH / WASPADA RIWAYAT UNIT (-{abs(rasio):.1f}%)"
+    skor_kewajaran = 70
+    keterangan_selisih = f"Iklan -{abs(rasio):.1f}% jauh di bawah tren pasar"
+    skrip_negosiasi = (
+        '"Catatan Sistem: Harga penawaran jauh di bawah rata-rata pasar. '
+        'Sebelum melanjutkan transaksi, pastikan Anda memeriksa keabsahan surat kendaraan (BPKB/STNK), '
+        'indikasi bekas tabrak rangka, atau bekas banjir bersama teknisi inspeksi."'
+    )
+else:
+    badge_status = "[✓] HARGA WAJAR PASAR (FAIR DEAL)"
+    skor_kewajaran = max(85, min(98, int(100 - abs(rasio))))
+    keterangan_selisih = "Harga iklan sesuai dengan tren nilai pasar wajar"
+    skrip_negosiasi = (
+        f'"Halo Pak/Bu, penawaran harga untuk {model_input} {tahun_input} ini sudah cukup wajar. '
+        f'Jika kondisi fisik dan riwayat servisnya sesuai dengan iklan, saya ingin menawar tipis '
+        f'di angka Rp {int(bid_awal):,} untuk kesepakatan minggu ini."'
+    )
 
 # ============================================================
-# 5. PENGUJIAN MENGGUNAKAN DATA RIIL OLX (5 SAMPEL)
+# TAMPILAN OUTPUT HASIL DETEKSI (SESUAI DASHBOARD MOCKUP)
+# ============================================================
+print("\n" + "=" * 60)
+print("             HASIL ANALISIS KEWAJARAN PENAWARAN             ")
+print("=" * 60)
+print(f"Unit Kendaraan  : {merek_input} {model_input} ({tahun_input})")
+print(f"Spesifikasi     : Transmisi {transmisi_input.title()} | {km_input:,} km")
+print(f"Status Deal     : {badge_status}")
+print("-" * 60)
+print(f"Harga Iklan OLX : Rp {int(harga_iklan_input):,}")
+print(f"Harga Wajar     : Rp {int(harga_wajar):,}")
+print(f"Analisis Margin : {keterangan_selisih}")
+print(f"Deal Score      : {skor_kewajaran} / 100")
+print("-" * 60)
+print("PANDUAN BATAS TAWAR-MENAWAR PEMBELI:")
+print(f"- Tawaran Awal (Opening Bid)  : Rp {int(bid_awal):,}")
+print(f"- Batas Maksimal Kesepakatan  : Rp {int(bid_maks):,}")
+print("-" * 60)
+print("SKRIP ARGUMEN NEGOSIASI SIAP PAKAI:")
+print(skrip_negosiasi)
+print("=" * 60 + "\n")
+
+# ============================================================
+# 5. PENGUJIAN MENGGUNAKAN DATA RIIL OLX (5 SAMPEL TETAP UTUH)
 # ============================================================
 df = pd.read_csv("dataset_olx_bersih.csv")
 df['model'] = df['judul'].apply(ekstrak_model)
