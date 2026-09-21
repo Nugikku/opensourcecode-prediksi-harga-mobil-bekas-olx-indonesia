@@ -1,22 +1,65 @@
 """
-Script Preprocessing Data Mobil Bekas OLX (Versi Terbaru)
+Script Preprocessing Data Mobil Bekas OLX (Versi Perbaikan)
 Pembaruan:
-1. Menangani format rentang jarak_tempuh (misal '65.000-70.000' dirata-rata jadi 67500).
-2. Ekstraksi otomatis 4 digit tahun dari 'judul' jika kolom 'tahun' kosong/None.
-3. Ekstraksi otomatis transmisi (otomatis/manual) dari teks 'judul'.
-4. Pembersihan angka harga dan normalisasi teks menggunakan kamus slang otomotif.
+1. Ekstraksi otomatis tipe/seri model dari teks 'judul' (agar tidak menjadi 'Lainnya' 100%).
+2. Menangani format rentang jarak_tempuh (misal '65.000-70.000' dirata-rata jadi 67500).
+3. Ekstraksi otomatis 4 digit tahun dari 'judul' jika kolom 'tahun' kosong/None.
+4. Ekstraksi otomatis transmisi (otomatis/manual) dari teks 'judul' dan deskripsi.
+5. Pembersihan angka harga dan normalisasi teks menggunakan kamus slang otomotif.
 """
 
 import pandas as pd
 import re
 import string
-from kamus_slang_otomotif import KAMUS_SLANG_OTOMOTIF
+
+try:
+    from kamus_slang_otomotif import KAMUS_SLANG_OTOMOTIF
+except ImportError:
+    KAMUS_SLANG_OTOMOTIF = {}
 
 INPUT_FILE = "dataset_olx_mentah.csv"
 OUTPUT_FILE = "dataset_olx_bersih.csv"
 
 # ============================================================
-# 1. TEXT CLEANING & NORMALISASI
+# 1. DAFTAR MODEL UNTUK EKSTRAKSI DARI JUDUL
+# ============================================================
+DAFTAR_MODEL = [
+    # Toyota
+    "alphard", "vellfire", "avanza", "innova", "fortuner", "yaris", "rush", 
+    "calya", "agya", "raize", "corolla", "camry", "vios", "hilux", "sienta", 
+    "granace", "land cruiser", "hiace", "veloz", "harrier", "voxy",
+    # Honda
+    "brio", "hrv", "crv", "city", "civic", "jazz", "mobilio", "brv", "accord", "freed", "odyssey", "wrv",
+    # Daihatsu
+    "xenia", "sigra", "terios", "ayla", "rocky", "sirion", "gran max", "luxio",
+    # Mitsubishi
+    "xpander", "pajero", "outlander", "mirage", "triton", "eclipse",
+    # Suzuki
+    "ertiga", "xl7", "ignis", "baleno", "jimny", "karimun", "sx4", "s-presso", "grand vitara", "every",
+    # Nissan
+    "grand livina", "livina", "serena", "xtrail", "juke", "march", "kicks", "magnite", "teana", "elgrand",
+    # BMW & Mercedes
+    "320i", "330i", "520i", "530i", "x1", "x3", "x5", "x7",
+    "c200", "c300", "e200", "e250", "e300", "s450", "glc", "gla", "gle", "amg", "cla", "cla200",
+    # Jeep & Mini
+    "rubicon", "wrangler", "sahara", "cherokee", "compass", "renegade",
+    "cooper", "countryman", "clubman",
+    # Hyundai & Wuling
+    "creta", "stargazer", "santa fe", "palisade", "ioniq", "tucson", "h-1",
+    "confero", "almaz", "cortez", "air ev", "binguo", "alvez",
+    # Lainnya
+    "bj40", "sealion", "defender", "rx300", "everest", "ranger", "tiguan"
+]
+
+def ekstrak_model(judul):
+    judul_lower = str(judul).lower()
+    for m in DAFTAR_MODEL:
+        if re.search(r'\b' + re.escape(m) + r'\b', judul_lower):
+            return m.title()
+    return "Lainnya"
+
+# ============================================================
+# 2. TEXT CLEANING & NORMALISASI
 # ============================================================
 
 def bersihkan_dan_normalisasi_teks(teks):
@@ -33,7 +76,7 @@ def bersihkan_dan_normalisasi_teks(teks):
     return ' '.join(kata_terfilter)
 
 # ============================================================
-# 2. NUMERICAL & FEATURE EXTRACTION
+# 3. NUMERICAL & FEATURE EXTRACTION
 # ============================================================
 
 def bersihkan_angka_harga(nilai):
@@ -85,7 +128,7 @@ def tentukan_transmisi(row):
     return 'manual'
 
 # ===========================================================
-# 3. PIPELINE UTAMA
+# 4. PIPELINE UTAMA
 # ===========================================================
 
 def main():
@@ -98,9 +141,10 @@ def main():
 
     print(f"Data awal: {len(df)} baris")
     
-    # 1. Ekstraksi Tahun & Transmisi
+    # 1. Ekstraksi Fitur dari Teks (Tahun, Transmisi, dan Model Seri)
     df['tahun'] = df.apply(cari_tahun, axis=1)
     df['transmisi'] = df.apply(tentukan_transmisi, axis=1)
+    df['model'] = df['judul'].apply(ekstrak_model)
 
     # 2. Pembersihan Angka (Harga & Jarak Tempuh)
     df['harga'] = df['harga'].apply(bersihkan_angka_harga)
@@ -118,9 +162,9 @@ def main():
     # 5. Hapus Duplikat
     if 'id_iklan' in df.columns:
         df = df.drop_duplicates(subset=['id_iklan'], keep='first')
-    df = df.drop_duplicates(subset=['merek', 'judul', 'tahun', 'jarak_tempuh', 'harga'], keep='first')
+    df = df.drop_duplicates(subset=['merek', 'model', 'tahun', 'transmisi', 'jarak_tempuh', 'harga'], keep='first')
 
-    # 6. Tangani Missing Values pada Jarak Tempuh dengan Median per Tahun (Fallback Median Global)
+    # 6. Imputasi Missing Values Jarak Tempuh (Median per Tahun)
     median_global = df['jarak_tempuh'].dropna().median()
     df['jarak_tempuh'] = df.groupby('tahun')['jarak_tempuh'].transform(lambda s: s.fillna(s.median()))
     df['jarak_tempuh'] = df['jarak_tempuh'].fillna(median_global).astype(int)
@@ -134,11 +178,11 @@ def main():
     df = df.reset_index(drop=True)
     print(f"Data bersih siap latih: {len(df)} baris")
 
-    # 8. Simpan Hasil
+    # 8. Simpan Hasil ke CSV
     df.to_csv(OUTPUT_FILE, index=False, encoding='utf-8-sig')
     print(f"Selesai! Disimpan ke '{OUTPUT_FILE}'\n")
     print("Contoh 5 data teratas:")
-    print(df[['merek', 'tahun', 'transmisi', 'jarak_tempuh', 'harga']].head())
+    print(df[['merek', 'model', 'tahun', 'transmisi', 'jarak_tempuh', 'harga']].head())
 
 if __name__ == "__main__":
     main()
